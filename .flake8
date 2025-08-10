@@ -1,0 +1,12 @@
+[flake8]
+max-line-length = 88
+extend-ignore =
+    E203,
+    E231,
+    W503,
+    C812, C813, C815, C816,
+    E303, E304, E305, E306, W391,
+    E731,
+inline-quotes = double
+multiline-quotes = double
+docstring-quotes = double
