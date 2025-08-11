@@ -134,3 +134,6 @@ terraform.tfstate.*
 
 !mlruns/
 !mkdocs.yml
+
+#models
+models/*
