@@ -554,6 +554,33 @@ def main():
     print("returns_df columns:", cum_returns.columns)
     print("optimized_weights keys:", optimized_weights.keys())
 
+    # Use the cum_returns DataFrame returned by backtest_strategy
+    # which has 'strategy' and 'benchmark' columns
+    plt.figure(figsize=(12, 6))
+    plt.plot(
+        cum_returns.index,
+        cum_returns["strategy"],
+        label="Strategy Portfolio",
+        linewidth=2,
+    )
+    plt.plot(
+        cum_returns.index,
+        cum_returns["benchmark"],
+        label="Benchmark Portfolio (60% SPY / 40% BND)",
+        linewidth=2,
+    )
+    plt.title("Cumulative Returns: Strategy vs Benchmark (Backtest Period)")
+    plt.xlabel("Date")
+    plt.ylabel("Cumulative Return")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(
+        figures_dir / "Cumulative Returns: Strategy vs Benchmark (Backtest Period).png"
+    )
+    plt.close()
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+# Define the folder path
+figures_dir = Path("reports/figures")
 
 
 def backtest_strategy(
@@ -96,6 +100,8 @@ def backtest_strategy(
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.show()
+    plt.savefig(figures_dir / "Backtest: Cumulative Returns Comparison.png")
+    plt.close()
 
     # --- Summary metrics ---
     performance = {
