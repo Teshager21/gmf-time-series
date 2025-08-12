@@ -15,6 +15,7 @@ from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 import warnings
 from portfolio.optimize import run_task4
+from portfolio.back_test import backtest_strategy
 
 warnings.filterwarnings("ignore")
 
@@ -529,6 +530,56 @@ def main():
         data=data, arima_forecasts=arima_forecasts, figures_dir=figures_dir
     )
     print(results["recommended"])
+
+    optimized_weights = results["recommended"]["weights"]
+    #  `data` and `optimized_weights` from Task 4):
+    cum_returns, perf = backtest_strategy(data, optimized_weights)
+    print("Performance Summary:", perf)
+    print("Returns DF head:\n", cum_returns.head())
+    print("Returns DF tail:\n", cum_returns.tail())
+
+    opt_weights_vector = np.array(
+        [optimized_weights.get(t, 0.0) for t in returns_df.columns]
+    )
+    bench_weights_vector = np.array(
+        [BENCHMARK_WEIGHTS.get(t, 0.0) for t in returns_df.columns]
+    )
+
+    print("Optimized weights vector:", opt_weights_vector)
+    print(
+        "optimized_weights keys:", optimized_weights.keys()
+    )  # This will show ticker keys correctly
+
+    print("Benchmark weights vector:", bench_weights_vector)
+    print("returns_df columns:", cum_returns.columns)
+    print("optimized_weights keys:", optimized_weights.keys())
+
+    # Use the cum_returns DataFrame returned by backtest_strategy
+    # which has 'strategy' and 'benchmark' columns
+    plt.figure(figsize=(12, 6))
+    plt.plot(
+        cum_returns.index,
+        cum_returns["strategy"],
+        label="Strategy Portfolio",
+        linewidth=2,
+    )
+    plt.plot(
+        cum_returns.index,
+        cum_returns["benchmark"],
+        label="Benchmark Portfolio (60% SPY / 40% BND)",
+        linewidth=2,
+    )
+    plt.title("Cumulative Returns: Strategy vs Benchmark (Backtest Period)")
+    plt.xlabel("Date")
+    plt.ylabel("Cumulative Return")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(
+        figures_dir / "Cumulative Returns: Strategy vs Benchmark (Backtest Period).png"
+    )
+    plt.close()
 
 
 if __name__ == "__main__":
