@@ -531,10 +531,28 @@ def main():
     )
     print(results["recommended"])
 
-    optimized_weights = results["recommended"]
-    # Example usage (assuming you have `data` and `optimized_weights` from Task 4):
+    optimized_weights = results["recommended"]["weights"]
+    #  `data` and `optimized_weights` from Task 4):
     cum_returns, perf = backtest_strategy(data, optimized_weights)
     print("Performance Summary:", perf)
+    print("Returns DF head:\n", cum_returns.head())
+    print("Returns DF tail:\n", cum_returns.tail())
+
+    opt_weights_vector = np.array(
+        [optimized_weights.get(t, 0.0) for t in returns_df.columns]
+    )
+    bench_weights_vector = np.array(
+        [BENCHMARK_WEIGHTS.get(t, 0.0) for t in returns_df.columns]
+    )
+
+    print("Optimized weights vector:", opt_weights_vector)
+    print(
+        "optimized_weights keys:", optimized_weights.keys()
+    )  # This will show ticker keys correctly
+
+    print("Benchmark weights vector:", bench_weights_vector)
+    print("returns_df columns:", cum_returns.columns)
+    print("optimized_weights keys:", optimized_weights.keys())
 
 
 if __name__ == "__main__":

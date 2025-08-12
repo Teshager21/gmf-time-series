@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 def backtest_strategy(
     data,  # dict of DataFrames with 'return' column keyed by tickers
-    optimized_weights,  # dict {ticker: weight} from Task 4
+    optimized_weights,  # dict from Task 4, can contain nested 'weights'
     backtest_start="2024-08-01",
     backtest_end="2025-07-31",
     benchmark_weights={"SPY": 0.6, "BND": 0.4},
@@ -17,7 +17,7 @@ def backtest_strategy(
 
     Parameters:
     - data: dict of pd.DataFrame with 'return' columns for each ticker.
-    - optimized_weights: dict of optimized weights from Task 4 (ticker -> weight).
+    - optimized_weights: dict from Task 4, can contain nested 'weights'.
     - backtest_start, backtest_end: strings for date slicing.
     - benchmark_weights: fixed benchmark weights (default 60% SPY, 40% BND).
     - risk_free: risk-free rate for Sharpe ratio calc (annual).
@@ -28,32 +28,49 @@ def backtest_strategy(
     - dict with performance metrics (total return, annual Sharpe) for both.
     """
 
-    # 1. Prepare aligned returns DataFrame with backtest window
+    # --- Extract actual weights dict if nested under 'weights' ---
+    if isinstance(optimized_weights, dict) and "weights" in optimized_weights:
+        opt_weights_dict = optimized_weights["weights"]
+    else:
+        opt_weights_dict = optimized_weights
+
+    # --- Prepare ticker-level daily returns DataFrame ---
     valid_tickers = [t for t in tickers if t in data and "return" in data[t].columns]
     returns_df = pd.DataFrame({t: data[t]["return"] for t in valid_tickers})
     returns_df = returns_df.loc[backtest_start:backtest_end].dropna()
 
-    # 2. Prepare weight vectors aligned with tickers in returns_df
-    # Fill zero weight if ticker missing in optimized or benchmark weights
+    # Debug: See what's being used
+    print("Backtest period:", returns_df.index.min(), "to", returns_df.index.max())
+    print("Valid tickers in backtest:", list(returns_df.columns))
+    print(
+        "Optimized weights being applied:",
+        {t: opt_weights_dict.get(t, 0.0) for t in returns_df.columns},
+    )
+
+    # --- Build aligned weight vectors ---
     opt_weights_vector = np.array(
-        [optimized_weights.get(t, 0.0) for t in returns_df.columns]
+        [opt_weights_dict.get(t, 0.0) for t in returns_df.columns]
     )
     bench_weights_vector = np.array(
         [benchmark_weights.get(t, 0.0) for t in returns_df.columns]
     )
 
-    # 3. Calculate daily portfolio returns
+    # Prevent all-zero weights issue
+    if np.isclose(opt_weights_vector.sum(), 0):
+        raise ValueError("Optimized weights sum to 0. Check ticker names and mapping.")
+
+    # --- Calculate daily portfolio returns ---
     strategy_returns = returns_df @ opt_weights_vector
     benchmark_returns = returns_df @ bench_weights_vector
 
-    # 4. Calculate cumulative returns
-    strategy_cum = (1 + strategy_returns).cumprod() - 1
-    benchmark_cum = (1 + benchmark_returns).cumprod() - 1
+    # --- Calculate cumulative returns (growth curves) ---
+    strategy_cum = (1 + strategy_returns).cumprod()
+    benchmark_cum = (1 + benchmark_returns).cumprod()
 
-    # 5. Calculate total return and annualized Sharpe ratio
+    # --- Performance metrics ---
     trading_days = 252
-    total_return_strategy = strategy_cum.iloc[-1]
-    total_return_benchmark = benchmark_cum.iloc[-1]
+    total_return_strategy = strategy_cum.iloc[-1] - 1
+    total_return_benchmark = benchmark_cum.iloc[-1] - 1
 
     sharpe_strategy = (strategy_returns.mean() * trading_days - risk_free) / (
         strategy_returns.std() * np.sqrt(trading_days)
@@ -62,12 +79,14 @@ def backtest_strategy(
         benchmark_returns.std() * np.sqrt(trading_days)
     )
 
-    # 6. Plot cumulative returns
+    # --- Plot cumulative returns ---
     plt.figure(figsize=(10, 6))
-    plt.plot(strategy_cum.index, strategy_cum, label="Strategy Portfolio", color="blue")
+    plt.plot(
+        strategy_cum.index, strategy_cum - 1, label="Strategy Portfolio", color="blue"
+    )
     plt.plot(
         benchmark_cum.index,
-        benchmark_cum,
+        benchmark_cum - 1,
         label="Benchmark (60% SPY / 40% BND)",
         color="orange",
     )
@@ -78,7 +97,7 @@ def backtest_strategy(
     plt.grid(True, alpha=0.3)
     plt.show()
 
-    # 7. Summary metrics
+    # --- Summary metrics ---
     performance = {
         "strategy": {
             "total_return": total_return_strategy,
@@ -91,12 +110,7 @@ def backtest_strategy(
     }
 
     cum_returns_df = pd.DataFrame(
-        {"strategy": strategy_cum, "benchmark": benchmark_cum}
+        {"strategy": strategy_cum - 1, "benchmark": benchmark_cum - 1}
     )
 
     return cum_returns_df, performance
-
-
-# Example usage (assuming you have `data` and `optimized_weights` from Task 4):
-# cum_returns, perf = backtest_strategy(data, optimized_weights)
-# print("Performance Summary:", perf)
