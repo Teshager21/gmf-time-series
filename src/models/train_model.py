@@ -15,6 +15,7 @@ from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 import warnings
 from portfolio.optimize import run_task4
+from portfolio.back_test import backtest_strategy
 
 warnings.filterwarnings("ignore")
 
@@ -529,6 +530,11 @@ def main():
         data=data, arima_forecasts=arima_forecasts, figures_dir=figures_dir
     )
     print(results["recommended"])
+
+    optimized_weights = results["recommended"]
+    # Example usage (assuming you have `data` and `optimized_weights` from Task 4):
+    cum_returns, perf = backtest_strategy(data, optimized_weights)
+    print("Performance Summary:", perf)
 
 
 if __name__ == "__main__":
