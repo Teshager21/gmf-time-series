@@ -14,6 +14,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 import warnings
+from portfolio.optimize import run_task4
 
 warnings.filterwarnings("ignore")
 
@@ -68,7 +69,6 @@ def load_local_parquet(ticker):
 
 def download_data():
     print("Downloading data...")
-    df = None
     try:
         df = yf.download(
             TICKERS,
@@ -76,37 +76,58 @@ def download_data():
             end=END_DATE,
             group_by="ticker",
             auto_adjust=False,
+            timeout=30,  # increase timeout
         )
+        print("Download succeeded.")
     except Exception as e:
         print(f"Warning: Exception during yfinance download: {e}")
+        df = None
 
     data_dict = {}
+    required_cols = ["open", "high", "low", "close", "adj_close", "volume"]
+
+    # If download completely failed, load all tickers locally
+    if df is None or df.empty:
+        print(
+            "Download failed or empty, loading all tickers from local parquet files..."
+        )
+        for ticker in TICKERS:
+            try:
+                ticker_df = load_local_parquet(ticker)
+                missing_cols = [
+                    col for col in required_cols if col not in ticker_df.columns
+                ]
+                if missing_cols:
+                    print(
+                        f"Local parquet for {ticker} "
+                        "missing columns {missing_cols}, skipping."
+                    )
+                    continue
+                data_dict[ticker] = ticker_df[required_cols].copy()
+                print(f"Loaded {ticker} from local parquet.")
+            except Exception as e:
+                print(f"Failed to load local parquet for {ticker}: {e}")
+        if not data_dict:
+            raise RuntimeError("No data loaded from download or local files. Exiting.")
+        return data_dict
+
+    # Otherwise, try to load each ticker from download with fallback to local
     for ticker in TICKERS:
         ticker_df = None
-
-        # Try extracting from downloaded df if exists
-        if df is not None and ticker in df.columns.levels[0]:
-            ticker_df = df[ticker].copy()
-            ticker_df.columns = ticker_df.columns.str.lower().str.replace(" ", "_")
-
-            required_cols = ["open", "high", "low", "close", "adj_close", "volume"]
-            missing_cols = [
-                col for col in required_cols if col not in ticker_df.columns
-            ]
-            if missing_cols:
+        if ticker in df.columns.levels[0]:
+            temp_df = df[ticker].copy()
+            temp_df.columns = temp_df.columns.str.lower().str.replace(" ", "_")
+            missing_cols = [col for col in required_cols if col not in temp_df.columns]
+            if not missing_cols:
+                ticker_df = temp_df
+            else:
                 print(
-                    f"Warning: Missing columns {missing_cols} for "
-                    "{ticker} in downloaded data, trying local file."
+                    f"Warning: Missing columns {missing_cols} for {ticker} "
+                    "in downloaded data, falling back to local parquet."
                 )
-                ticker_df = None  # fallback to local
-
         else:
-            print(
-                f"Warning: {ticker} data not found in downloaded data,"
-                " trying local file."
-            )
+            print(f"{ticker} not found in downloaded data, trying local parquet.")
 
-        # If ticker_df is still None, try loading local parquet
         if ticker_df is None:
             try:
                 ticker_df = load_local_parquet(ticker)
@@ -115,22 +136,19 @@ def download_data():
                 print(f"Error loading local parquet for {ticker}: {e}")
                 continue
 
-        # Check required columns again on final ticker_df
-        required_cols = ["open", "high", "low", "close", "adj_close", "volume"]
         missing_cols = [col for col in required_cols if col not in ticker_df.columns]
         if missing_cols:
             print(
-                f"Error: Missing columns {missing_cols} "
-                "for {ticker} after loading. Skipping."
+                f"Error: Missing columns {missing_cols}"
+                " in final data for {ticker}, skipping."
             )
             continue
 
-        # Save to dict only if all required columns present
         data_dict[ticker] = ticker_df[required_cols].copy()
 
     if not data_dict:
         raise RuntimeError(
-            "Failed to obtain data for all tickers from both download and local files."
+            "Failed to load data for all tickers from download and local files."
         )
 
     return data_dict
@@ -505,6 +523,12 @@ def main():
 
     print(f"Strategy Portfolio Sharpe Ratio: {sharpe_ratio(strat_returns):.4f}")
     print(f"Benchmark Portfolio Sharpe Ratio: {sharpe_ratio(bench_returns):.4f}")
+
+    # optimize
+    results = run_task4(
+        data=data, arima_forecasts=arima_forecasts, figures_dir=figures_dir
+    )
+    print(results["recommended"])
 
 
 if __name__ == "__main__":
